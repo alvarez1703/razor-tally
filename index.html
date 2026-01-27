@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Razor">
+    <meta name="theme-color" content="#0c0a09">
+    <title>Razor Tally</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg-deep: #0c0a09;
+            --bg-surface: #1c1917;
+            --gold: #d4a574;
+            --gold-light: #e9c9a8;
+            --gold-dark: #a67c4a;
+            --platinum: #e7e5e4;
+            --text: #fafaf9;
+            --text-muted: #78716c;
+            --warning: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text);
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Grain texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Radial glow */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(212, 165, 116, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Header with decorative elements */
+        .header {
+            text-align: center;
+            position: relative;
+        }
+
+        .header-decoration {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .header-line {
+            width: 40px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        .header-icon {
+            font-size: 1.5rem;
+            filter: grayscale(0.3);
+        }
+
+        .header h1 {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            background: linear-gradient(180deg, var(--platinum) 0%, var(--gold-light) 50%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* Tally display area */
+        .tally-section {
+            width: 100%;
+            background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(28, 25, 23, 0.5) 100%);
+            border: 1px solid rgba(212, 165, 116, 0.15);
+            border-radius: 24px;
+            padding: 40px 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tally-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        .tally-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+
+        .tally-mark {
+            width: 36px;
+            height: 90px;
+            background: var(--bg-deep);
+            border: 1px solid rgba(120, 113, 108, 0.3);
+            border-radius: 18px;
+            position: relative;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+        }
+
+        .tally-mark::before {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            border-radius: 15px;
+            background: transparent;
+            transition: all 0.5s ease;
+        }
+
+        .tally-mark.active {
+            border-color: var(--gold);
+            box-shadow: 
+                0 0 20px rgba(212, 165, 116, 0.2),
+                inset 0 0 20px rgba(212, 165, 116, 0.1);
+        }
+
+        .tally-mark.active::before {
+            background: linear-gradient(180deg, 
+                var(--gold-light) 0%, 
+                var(--gold) 50%, 
+                var(--gold-dark) 100%
+            );
+            box-shadow: 0 2px 10px rgba(212, 165, 116, 0.4);
+        }
+
+        /* Fifth tally warning state */
+        .tally-mark:nth-child(5).active {
+            border-color: var(--warning);
+            box-shadow: 
+                0 0 30px rgba(239, 68, 68, 0.3),
+                inset 0 0 20px rgba(239, 68, 68, 0.1);
+            animation: pulse-warning 2s ease-in-out infinite;
+        }
+
+        .tally-mark:nth-child(5).active::before {
+            background: linear-gradient(180deg, 
+                #fca5a5 0%, 
+                #ef4444 50%, 
+                #b91c1c 100%
+            );
+        }
+
+        @keyframes pulse-warning {
+            0%, 100% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.3), inset 0 0 20px rgba(239, 68, 68, 0.1); }
+            50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5), inset 0 0 25px rgba(239, 68, 68, 0.15); }
+        }
+
+        /* Counter display */
+        .counter-display {
+            text-align: center;
+            position: relative;
+        }
+
+        .counter-wrapper {
+            display: inline-block;
+            position: relative;
+        }
+
+        .counter-number {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: 6rem;
+            font-weight: 300;
+            line-height: 1;
+            background: linear-gradient(180deg, var(--platinum) 0%, var(--gold-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .counter-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Message area */
+        .message {
+            min-height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .message-text {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            font-style: italic;
+            color: var(--text-muted);
+            opacity: 0;
+            transform: translateY(15px);
+            transition: all 0.5s ease;
+        }
+
+        .message-text.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .message-text.alert {
+            color: var(--warning);
+            font-style: normal;
+            font-weight: 500;
+            text-shadow: 0 0 30px rgba(239, 68, 68, 0.5);
+        }
+
+        .message-text.ready {
+            color: var(--gold);
+        }
+
+        /* Buttons */
+        .actions {
+            width: 100%;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 20px 32px;
+            border: none;
+            border-radius: 16px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+            color: var(--bg-deep);
+            box-shadow: 
+                0 4px 20px rgba(212, 165, 116, 0.3),
+                0 0 0 1px rgba(212, 165, 116, 0.5);
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+            box-shadow: 
+                0 2px 10px rgba(212, 165, 116, 0.2),
+                0 0 0 1px rgba(212, 165, 116, 0.5);
+        }
+
+        .btn-primary:active::before {
+            left: 100%;
+        }
+
+        .btn-reset {
+            background: transparent;
+            color: var(--success);
+            border: 1px solid var(--success);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
+        }
+
+        .btn-reset:active {
+            background: rgba(34, 197, 94, 0.1);
+            box-shadow: 0 0 30px rgba(34, 197, 94, 0.2);
+        }
+
+        /* Decorative footer */
+        .footer-decoration {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .footer-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--gold);
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        .footer-line {
+            width: 30px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--text-muted), transparent);
+        }
+
+        /* Animations */
+        @keyframes scale-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .scale-in {
+            animation: scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        .shake {
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
+        }
+
+        .glow-pulse {
+            animation: glow-pulse 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [count, setCount] = useState(() => {
+                const saved = localStorage.getItem('razorTally');
+                return saved ? parseInt(saved, 10) : 0;
+            });
+            const [animating, setAnimating] = useState(false);
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                localStorage.setItem('razorTally', count.toString());
+            }, [count]);
+
+            const addTally = () => {
+                if (count < 5) {
+                    setCount(c => c + 1);
+                    setAnimating(true);
+                    setTimeout(() => setAnimating(false), 400);
+                } else {
+                    if (containerRef.current) {
+                        containerRef.current.classList.add('shake');
+                        setTimeout(() => containerRef.current?.classList.remove('shake'), 500);
+                    }
+                }
+            };
+
+            const resetTally = () => {
+                setCount(0);
+            };
+
+            const isMaxed = count >= 5;
+
+            const getMessage = () => {
+                if (isMaxed) return { text: "It's time to change the razor!", className: 'alert' };
+                if (count === 4) return { text: "One shave remaining", className: 'ready' };
+                if (count === 0) return { text: "Fresh blade ready", className: 'ready' };
+                return { text: "", className: '' };
+            };
+
+            const message = getMessage();
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <div className="header-decoration">
+                            <div className="header-line"></div>
+                            <span className="header-icon">🪒</span>
+                            <div className="header-line"></div>
+                        </div>
+                        <h1>Razor</h1>
+                        <p>Blade Tracker</p>
+                    </div>
+
+                    <div className="tally-section" ref={containerRef}>
+                        <div className="tally-container">
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <div 
+                                    key={i} 
+                                    className={`tally-mark ${i <= count ? 'active' : ''} ${i === count && animating ? 'scale-in' : ''}`}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="counter-display">
+                            <div className="counter-wrapper">
+                                <div className={`counter-number ${animating ? 'glow-pulse' : ''}`}>
+                                    {count}
+                                </div>
+                            </div>
+                            <div className="counter-label">
+                                {count === 1 ? 'use' : 'uses'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="message">
+                        <div className={`message-text ${message.text ? 'visible' : ''} ${message.className}`}>
+                            {message.text}
+                        </div>
+                    </div>
+
+                    <div className="actions">
+                        {isMaxed ? (
+                            <button className="btn btn-reset" onClick={resetTally}>
+                                ✓ Blade Changed — Reset
+                            </button>
+                        ) : (
+                            <button className="btn btn-primary" onClick={addTally}>
+                                Add Use
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="footer-decoration">
+                        <div className="footer-line"></div>
+                        <div className="footer-dot"></div>
+                        <div className="footer-line"></div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
